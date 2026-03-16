@@ -11,6 +11,9 @@ class Lexer:
         'to': TokenType.TO,
         'true': TokenType.TRUE,
         'false': TokenType.FALSE,
+        'and': TokenType.AND,
+        'or': TokenType.OR,
+        'not': TokenType.NOT,
     }
 
     def __init__(self, text):

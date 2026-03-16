@@ -31,6 +31,12 @@ class Interpreter:
     def visit_BooleanNode(self, node):
         return True if node.token.type == TokenType.TRUE else False
 
+    def visit_UnaryOpNode(self, node):
+        res = self.visit(node.node)
+        if node.op_token.type == TokenType.NOT:
+            return not res
+        return res
+
     def visit_VarAssignNode(self, node):
         var_name = node.var_name_token.value
         value = self.visit(node.value_node)
@@ -77,6 +83,10 @@ class Interpreter:
             return left <= right
         elif node.op_token.type == TokenType.GTE:
             return left >= right
+        elif node.op_token.type == TokenType.AND:
+            return left and right
+        elif node.op_token.type == TokenType.OR:
+            return left or right
 
     def visit_IfNode(self, node):
         for condition, block in node.cases:

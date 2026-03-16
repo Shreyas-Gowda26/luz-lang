@@ -15,6 +15,12 @@ class BooleanNode:
         self.token = token
     def __repr__(self): return f"{self.token.type.name.lower()}"
 
+class UnaryOpNode:
+    def __init__(self, op_token, node):
+        self.op_token = op_token
+        self.node = node
+    def __repr__(self): return f"({self.op_token.type.name} {self.node})"
+
 class VarAccessNode:
     def __init__(self, token):
         self.token = token
@@ -176,10 +182,23 @@ class Parser:
         return ForNode(var_name, start_value, end_value, block)
 
     def expr(self):
-        return self.bin_op(self.comp_expr, (TokenType.EE, TokenType.NE, TokenType.LT, TokenType.GT, TokenType.LTE, TokenType.GTE))
+        return self.logical_or()
+
+    def logical_or(self):
+        return self.bin_op(self.logical_and, (TokenType.OR,))
+
+    def logical_and(self):
+        return self.bin_op(self.logical_not, (TokenType.AND,))
+
+    def logical_not(self):
+        if self.current_token.type == TokenType.NOT:
+            op_token = self.current_token
+            self.advance()
+            return UnaryOpNode(op_token, self.logical_not())
+        return self.comp_expr()
 
     def comp_expr(self):
-        return self.bin_op(self.arith_expr, (TokenType.PLUS, TokenType.MINUS))
+        return self.bin_op(self.arith_expr, (TokenType.EE, TokenType.NE, TokenType.LT, TokenType.GT, TokenType.LTE, TokenType.GTE))
 
     def arith_expr(self):
         return self.bin_op(self.term, (TokenType.PLUS, TokenType.MINUS))

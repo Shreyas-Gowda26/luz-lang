@@ -24,6 +24,9 @@ class TokenType(Enum):
     TO = auto()
     TRUE = auto()
     FALSE = auto()
+    AND = auto()
+    OR = auto()
+    NOT = auto()
     STRING = auto()
     COMMA = auto()       # ,
     LBRACE = auto()      # {
