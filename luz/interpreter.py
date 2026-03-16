@@ -4,7 +4,8 @@ class Interpreter:
     def __init__(self):
         self.symbol_table = {}
         self.builtins = {
-            'write': self.builtin_write
+            'write': self.builtin_write,
+            'listen': self.builtin_listen
         }
 
     def visit(self, node):
@@ -84,6 +85,23 @@ class Interpreter:
         
         return 0.0
 
+    def visit_WhileNode(self, node):
+        while self.visit(node.condition_node):
+            self.visit(node.block)
+        return None
+
+    def visit_ForNode(self, node):
+        var_name = node.var_name_token.value
+        start_value = self.visit(node.start_value_node)
+        end_value = self.visit(node.end_value_node)
+
+        i = start_value
+        while i <= end_value:
+            self.symbol_table[var_name] = i
+            self.visit(node.block)
+            i += 1
+        return None
+
     def visit_CallNode(self, node):
         func_name = node.func_name_token.value
         args = [self.visit(arg) for arg in node.arguments]
@@ -96,3 +114,10 @@ class Interpreter:
     def builtin_write(self, *args):
         print(*args)
         return None
+
+    def builtin_listen(self, prompt=""):
+        res = input(prompt)
+        try:
+            return float(res)
+        except ValueError:
+            return res

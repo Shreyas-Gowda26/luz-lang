@@ -33,6 +33,18 @@ class IfNode:
         self.cases = cases # List of (condition, block)
         self.else_case = else_case # Block
 
+class WhileNode:
+    def __init__(self, condition_node, block):
+        self.condition_node = condition_node
+        self.block = block
+
+class ForNode:
+    def __init__(self, var_name_token, start_value_node, end_value_node, block):
+        self.var_name_token = var_name_token
+        self.start_value_node = start_value_node
+        self.end_value_node = end_value_node
+        self.block = block
+
 class CallNode:
     def __init__(self, func_name_token, arguments):
         self.func_name_token = func_name_token
@@ -62,6 +74,12 @@ class Parser:
     def statement(self):
         if self.current_token.type == TokenType.IF:
             return self.if_expr()
+        
+        if self.current_token.type == TokenType.WHILE:
+            return self.while_expr()
+        
+        if self.current_token.type == TokenType.FOR:
+            return self.for_expr()
         
         if self.current_token.type == TokenType.IDENTIFIER:
             # Lookahead for assignment
@@ -116,6 +134,41 @@ class Parser:
             self.advance()
 
         return IfNode(cases, else_case)
+
+    def while_expr(self):
+        self.advance() # while
+        condition = self.expr()
+        if self.current_token.type != TokenType.LBRACE:
+            raise Exception("Esperado '{' después de la condición de while")
+        self.advance()
+        block = self.statements()
+        if self.current_token.type != TokenType.RBRACE:
+            raise Exception("Esperado '}' después del bloque de while")
+        self.advance()
+        return WhileNode(condition, block)
+
+    def for_expr(self):
+        self.advance() # for
+        if self.current_token.type != TokenType.IDENTIFIER:
+            raise Exception("Esperado nombre de variable después de 'for'")
+        var_name = self.current_token
+        self.advance()
+        if self.current_token.type != TokenType.ASSIGN:
+            raise Exception("Esperado '=' después del nombre de variable en for")
+        self.advance()
+        start_value = self.expr()
+        if self.current_token.type != TokenType.TO:
+            raise Exception("Esperado 'to' después del valor inicial en for")
+        self.advance()
+        end_value = self.expr()
+        if self.current_token.type != TokenType.LBRACE:
+            raise Exception("Esperado '{' después del rango en for")
+        self.advance()
+        block = self.statements()
+        if self.current_token.type != TokenType.RBRACE:
+            raise Exception("Esperado '}' después del bloque de for")
+        self.advance()
+        return ForNode(var_name, start_value, end_value, block)
 
     def expr(self):
         return self.bin_op(self.comp_expr, (TokenType.EE, TokenType.NE, TokenType.LT, TokenType.GT, TokenType.LTE, TokenType.GTE))

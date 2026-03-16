@@ -19,6 +19,9 @@ class TokenType(Enum):
     IF = auto()
     ELIF = auto()
     ELSE = auto()
+    WHILE = auto()
+    FOR = auto()
+    TO = auto()
     STRING = auto()
     COMMA = auto()       # ,
     LBRACE = auto()      # {
