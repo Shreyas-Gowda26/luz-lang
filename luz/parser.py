@@ -1,5 +1,8 @@
 from .tokens import TokenType
-from .exceptions import UnexpectedTokenFault, UnexpectedEOFault, StructureFault
+from .exceptions import (
+    UnexpectedTokenFault, UnexpectedEOFault, StructureFault,
+    ParseFault, ExpressionFault, OperatorFault
+)
 
 class NumberNode:
     def __init__(self, token):
@@ -118,7 +121,14 @@ class Parser:
             self.current_token = self.tokens[self.pos]
 
     def parse(self):
-        return self.statements()
+        try:
+            return self.statements()
+        except UnexpectedTokenFault as e:
+            raise e
+        except SyntaxFault as e:
+            raise e
+        except Exception as e:
+            raise ParseFault(f"Error while parsing code: {str(e)}")
 
     def statements(self):
         statements = []
@@ -384,7 +394,7 @@ class Parser:
         elif token.type == TokenType.EOF:
             raise UnexpectedEOFault("Unexpected end of expression")
         else:
-            raise UnexpectedTokenFault(f"Unexpected token: {token}")
+            raise ExpressionFault(f"Invalid expression at token: {token}")
 
         while self.current_token.type == TokenType.LBRACKET:
             self.advance()
@@ -465,6 +475,9 @@ class Parser:
         while self.current_token.type in ops:
             op_token = self.current_token
             self.advance()
-            right = func()
+            try:
+                right = func()
+            except ExpressionFault:
+                raise OperatorFault(f"Operator '{op_token}' expects a valid expression on the right")
             left = BinOpNode(left, op_token, right)
         return left

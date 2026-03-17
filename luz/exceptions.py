@@ -15,6 +15,9 @@ class LogicFault(LuzError): pass
 class AccessFault(LuzError): pass
 
 class SyntaxFault(LuzError): pass
+class ParseFault(SyntaxFault): pass
+class ExpressionFault(SyntaxFault): pass
+class OperatorFault(SyntaxFault): pass
 class UnexpectedTokenFault(SyntaxFault): pass
 class InvalidTokenFault(SyntaxFault): pass
 class StructureFault(SyntaxFault): pass
