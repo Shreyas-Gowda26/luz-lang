@@ -7,51 +7,46 @@ from luz.parser import Parser
 from luz.interpreter import Interpreter
 
 def test_arithmetic():
-    print("Probando aritmética...")
+    print("Testing arithmetic...")
     interpreter = Interpreter()
     cases = [("1 + 2 * 3", 7.0), ("(1 + 2) * 3", 9.0), ("10 / 2 - 1", 4.0)]
     for code, expected in cases:
         tokens = Lexer(code).get_tokens()
         ast = Parser(tokens).parse()
         assert interpreter.visit(ast) == expected
-    print("Aritmética: OK")
+    print("Arithmetic: OK")
 
 def test_variables_and_strings():
-    print("Probando variables y strings...")
+    print("Testing variables and strings...")
     interpreter = Interpreter()
-    # Variables y concatenación
-    code = 'a = "hola" b = " mundo" res = a + b'
+    code = 'a = "hello" b = " world" res = a + b'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
-    assert interpreter.global_env.lookup('res') == "hola mundo"
+    assert interpreter.global_env.lookup('res') == "hello world"
     
-    # Multiplicación de strings
     code = 'risa = "ja" * 3'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('risa') == "jajaja"
-    print("Variables y strings: OK")
+    print("Variables and strings: OK")
 
 def test_control_flow():
-    print("Probando flujo de control (if, while, for)...")
+    print("Testing control flow (if, while, for)...")
     interpreter = Interpreter()
     
-    # If/Else
-    code = 'x = 10 if x > 5 { res = "si" } else { res = "no" }'
+    code = 'x = 10 if x > 5 { res = "yes" } else { res = "no" }'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
-    assert interpreter.global_env.lookup('res') == "si"
+    assert interpreter.global_env.lookup('res') == "yes"
     
-    # While
     code = 'i = 0 while i < 5 { i = i + 1 }'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('i') == 5.0
     
-    # For
     code = 'total = 0 for k = 1 to 5 { total = total + k }'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('total') == 15.0
-    print("Flujo de control: OK")
+    print("Control flow: OK")
 
 def test_logical_and_booleans():
-    print("Probando booleanos y lógica...")
+    print("Testing booleans and logic...")
     interpreter = Interpreter()
     cases = [
         ("true and false", False),
@@ -63,10 +58,10 @@ def test_logical_and_booleans():
         tokens = Lexer(code).get_tokens()
         ast = Parser(tokens).parse()
         assert interpreter.visit(ast) == expected
-    print("Booleanos y lógica: OK")
+    print("Booleans and logic: OK")
 
 def test_functions():
-    print("Probando funciones...")
+    print("Testing functions...")
     interpreter = Interpreter()
     code = '''
     function factorial(n) {
@@ -77,59 +72,50 @@ def test_functions():
     '''
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('res') == 120.0
-    print("Funciones y recursividad: OK")
+    print("Functions and recursion: OK")
 
 def test_lists():
-    print("Probando listas...")
+    print("Testing lists...")
     interpreter = Interpreter()
-    
-    # Literales y acceso
-    code = 'l = [10, "hola", true] res = l[0] + 5'
+    code = 'l = [10, "hello", true] res = l[0] + 5'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('res') == 15.0
     
-    # Modificación
-    code = 'l[1] = "mundo" val = l[1]'
+    code = 'l[1] = "world" val = l[1]'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
-    assert interpreter.global_env.lookup('val') == "mundo"
+    assert interpreter.global_env.lookup('val') == "world"
     
-    # Built-ins
     code = 'append(l, 40) tam = len(l) ultimo = pop(l)'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('tam') == 4.0
     assert interpreter.global_env.lookup('ultimo') == 40.0
-    print("Listas: OK")
+    print("Lists: OK")
 
 def test_dicts():
-    print("Probando diccionarios...")
+    print("Testing dictionaries...")
     interpreter = Interpreter()
-    
-    # Literales y acceso
-    code = 'd = {"nombre": "Eloi", "edad": 25} res = d["nombre"]'
+    code = 'd = {"name": "Elabsurdo984", "age": 25} res = d["name"]'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('res') == "Eloi"
     
-    # Modificación e inserción
-    code = 'd["edad"] = 26 d["ciudad"] = "BCN"'
+    code = 'd["age"] = 26 d["city"] = "BCN"'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     d = interpreter.global_env.lookup('d')
-    assert d["edad"] == 26.0
-    assert d["ciudad"] == "BCN"
+    assert d["age"] == 26.0
+    assert d["city"] == "BCN"
     
-    # Built-ins
     code = 'ks = keys(d) tam = len(d)'
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     assert interpreter.global_env.lookup('tam') == 3.0
-    # keys() devuelve una lista, el orden puede variar pero el contenido no
     ks = interpreter.global_env.lookup('ks')
-    assert "nombre" in ks and "edad" in ks and "ciudad" in ks
-    print("Diccionarios: OK")
+    assert "name" in ks and "age" in ks and "city" in ks
+    print("Dictionaries: OK")
 
 def test_errors():
-    print("Probando manejo de errores...")
+    print("Testing error handling...")
     interpreter = Interpreter()
     
-    # attempt / rescue con MathFault
+    # attempt / rescue with ZeroDivisionFault
     code = '''
     msg = ""
     attempt {
@@ -140,24 +126,24 @@ def test_errors():
     '''
     interpreter.visit(Parser(Lexer(code).get_tokens()).parse())
     msg = interpreter.global_env.lookup('msg')
-    assert "División por cero" in str(msg)
+    assert "Division by zero" in str(msg)
     
     # alert
     code2 = '''
-    capturado = ""
+    caught = ""
     attempt {
-        alert "Mi error personalizado"
+        alert "My custom error"
     } rescue (e) {
-        capturado = e
+        caught = e
     }
     '''
     interpreter.visit(Parser(Lexer(code2).get_tokens()).parse())
-    capturado = interpreter.global_env.lookup('capturado')
-    assert "Mi error personalizado" in str(capturado)
-    print("Manejo de errores: OK")
+    caught = interpreter.global_env.lookup('caught')
+    assert "My custom error" in str(caught)
+    print("Error handling: OK")
 
 def run_all():
-    print("=== INICIANDO SUITE DE PRUEBAS DE LUZ ===\n")
+    print("=== STARTING LUZ TEST SUITE ===\n")
     try:
         test_arithmetic()
         test_variables_and_strings()
@@ -167,9 +153,9 @@ def run_all():
         test_lists()
         test_dicts()
         test_errors()
-        print("\n=== ¡TODAS LAS PRUEBAS PASARON CON ÉXITO! ===")
+        print("\n=== ALL TESTS PASSED SUCCESSFULLY! ===")
     except Exception as e:
-        print(f"\nERROR EN LAS PRUEBAS: {e}")
+        print(f"\nTEST ERROR: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
