@@ -14,6 +14,10 @@ class MathFault(LuzError): pass
 class LogicFault(LuzError): pass
 class AccessFault(LuzError): pass
 
+class SemanticFault(LuzError): pass
+class IllegalOperationFault(SemanticFault): pass
+class InvalidUsageFault(SemanticFault): pass
+
 class SyntaxFault(LuzError): pass
 class ParseFault(SyntaxFault): pass
 class ExpressionFault(SyntaxFault): pass

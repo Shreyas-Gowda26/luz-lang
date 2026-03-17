@@ -1,7 +1,8 @@
 from .tokens import TokenType
 from .exceptions import (
     LuzError, ReturnException, MathFault, LogicFault, 
-    AccessFault, SyntaxFault, SystemFault, UserFault
+    AccessFault, SyntaxFault, SystemFault, UserFault,
+    SemanticFault, IllegalOperationFault, InvalidUsageFault
 )
 
 class Environment:
@@ -114,15 +115,17 @@ class Interpreter:
                 return base[int(index)]
             except IndexError:
                 raise AccessFault(f"Index {index} out of range")
-            except ValueError:
-                raise LogicFault(f"List index must be an integer")
+            except (ValueError, TypeError):
+                raise IllegalOperationFault(f"List index must be an integer, not {type(index).__name__}")
         elif isinstance(base, dict):
             try:
                 return base[index]
             except KeyError:
                 raise AccessFault(f"Key '{index}' not found in dictionary")
+            except TypeError:
+                raise IllegalOperationFault(f"Unhashable type: '{type(index).__name__}' cannot be a dictionary key")
         else:
-            raise LogicFault("Object does not support indexing")
+            raise InvalidUsageFault(f"Object of type '{type(base).__name__}' is not indexable")
 
     def visit_IndexAssignNode(self, node):
         base = self.visit(node.base_node)
@@ -135,13 +138,16 @@ class Interpreter:
                 return value
             except IndexError:
                 raise AccessFault(f"Index {index} out of range")
-            except ValueError:
-                raise LogicFault(f"List index must be an integer")
+            except (ValueError, TypeError):
+                raise IllegalOperationFault(f"List index must be an integer")
         elif isinstance(base, dict):
-            base[index] = value
-            return value
+            try:
+                base[index] = value
+                return value
+            except TypeError:
+                raise IllegalOperationFault(f"Unhashable type: '{type(index).__name__}'")
         else:
-            raise LogicFault("Object does not support index assignment")
+            raise InvalidUsageFault(f"Object of type '{type(base).__name__}' does not support index assignment")
 
     def visit_AttemptRescueNode(self, node):
         try:
@@ -193,43 +199,56 @@ class Interpreter:
         right = self.visit(node.right_node)
 
         if node.op_token.type == TokenType.PLUS:
-            return left + right
+            try:
+                return left + right
+            except TypeError:
+                raise IllegalOperationFault(f"Cannot add {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.MINUS:
             if isinstance(left, str) or isinstance(right, str):
-                raise LogicFault("Operation '-' not supported for strings")
-            return left - right
+                raise IllegalOperationFault("Minus operation '-' is not supported for strings")
+            try:
+                return left - right
+            except TypeError:
+                raise IllegalOperationFault(f"Unsupported operand types for '-': {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.MUL:
             if isinstance(left, str) and isinstance(right, float):
                 return left * int(right)
-            if isinstance(left, float) or isinstance(right, float):
+            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
                  return left * right
-            raise LogicFault("Operation '*' only supported between numbers or string and number")
+            raise IllegalOperationFault("Multiplication '*' is only supported between numbers or string and number")
         elif node.op_token.type == TokenType.DIV:
             if isinstance(left, str) or isinstance(right, str):
-                raise LogicFault("Operation '/' not supported for strings")
+                raise IllegalOperationFault("Division operation '/' is not supported for strings")
             if right == 0:
                 raise MathFault("Division by zero")
-            return left / right
+            try:
+                return left / right
+            except TypeError:
+                raise IllegalOperationFault(f"Unsupported operand types for '/': {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.EE:
             return left == right
         elif node.op_token.type == TokenType.NE:
             return left != right
         elif node.op_token.type == TokenType.LT:
-            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            try:
                 return left < right
-            raise LogicFault("Comparison '<' only supported between numbers")
+            except TypeError:
+                raise IllegalOperationFault(f"Comparison '<' not supported between {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.GT:
-            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            try:
                 return left > right
-            raise LogicFault("Comparison '>' only supported between numbers")
+            except TypeError:
+                raise IllegalOperationFault(f"Comparison '>' not supported between {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.LTE:
-            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            try:
                 return left <= right
-            raise LogicFault("Comparison '<=' only supported between numbers")
+            except TypeError:
+                raise IllegalOperationFault(f"Comparison '<=' not supported between {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.GTE:
-            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            try:
                 return left >= right
-            raise LogicFault("Comparison '>=' only supported between numbers")
+            except TypeError:
+                raise IllegalOperationFault(f"Comparison '>=' not supported between {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.AND:
             return left and right
         elif node.op_token.type == TokenType.OR:
@@ -254,6 +273,9 @@ class Interpreter:
         var_name = node.var_name_token.value
         start_value = self.visit(node.start_value_node)
         end_value = self.visit(node.end_value_node)
+
+        if not isinstance(start_value, (int, float)) or not isinstance(end_value, (int, float)):
+            raise IllegalOperationFault("For loop range must be numeric")
 
         i = start_value
         previous_env = self.current_env
@@ -289,16 +311,16 @@ class Interpreter:
         try:
             function = self.current_env.lookup(func_name)
             if not isinstance(function, LuzFunction):
-                raise LogicFault(f"'{func_name}' is not a function")
+                raise InvalidUsageFault(f"'{func_name}' is of type '{type(function).__name__}' and is not callable")
             
             if len(arguments) != len(function.node.arg_tokens):
-                raise LogicFault(f"Expected {len(function.node.arg_tokens)} arguments, received {len(arguments)}")
+                raise InvalidUsageFault(f"Function '{func_name}' expects {len(function.node.arg_tokens)} arguments, but received {len(arguments)}")
             
             return function(self, arguments)
         except LuzError as e:
             raise e
         except Exception as e:
-            if "no definida" in str(e) or "not defined" in str(e):
+            if "not defined" in str(e):
                 raise AccessFault(f"Function '{func_name}' not defined")
             raise SystemFault(str(e))
 
@@ -317,35 +339,42 @@ class Interpreter:
         try:
             return float(len(obj))
         except:
-            raise LogicFault("Object has no length")
+            raise InvalidUsageFault(f"Object of type '{type(obj).__name__}' has no length")
 
     def builtin_append(self, list_obj, element):
         if not isinstance(list_obj, list):
-            raise LogicFault("append() requires a list as first argument")
+            raise InvalidUsageFault("append() expects a list as the first argument")
         list_obj.append(element)
         return None
 
     def builtin_pop(self, list_obj, index=None):
         if not isinstance(list_obj, list):
-            raise LogicFault("pop() requires a list as first argument")
+            raise InvalidUsageFault("pop() expects a list as the first argument")
         try:
             if index is None:
                 return list_obj.pop()
             return list_obj.pop(int(index))
         except IndexError:
             raise AccessFault("Index out of range in pop()")
+        except (ValueError, TypeError):
+            raise IllegalOperationFault("Pop index must be an integer")
 
     def builtin_keys(self, dict_obj):
         if not isinstance(dict_obj, dict):
-            raise LogicFault("keys() requires a dictionary")
+            raise InvalidUsageFault("keys() expects a dictionary")
         return list(dict_obj.keys())
 
     def builtin_values(self, dict_obj):
         if not isinstance(dict_obj, dict):
-            raise LogicFault("values() requires a dictionary")
+            raise InvalidUsageFault("values() expects a dictionary")
         return list(dict_obj.values())
 
     def builtin_remove(self, dict_obj, key):
         if not isinstance(dict_obj, dict):
-            raise LogicFault("remove() requires a dictionary")
-        return dict_obj.pop(key, None)
+            raise InvalidUsageFault("remove() expects a dictionary")
+        try:
+            return dict_obj.pop(key)
+        except KeyError:
+            raise AccessFault(f"Key '{key}' not found in dictionary")
+        except TypeError:
+            raise IllegalOperationFault(f"Unhashable type: '{type(key).__name__}'")
