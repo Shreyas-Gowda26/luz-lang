@@ -118,7 +118,7 @@ class LuzFunction:
     # It validates the argument count, binds parameters to a new environment,
     # runs the body, and catches ReturnException to extract the return value.
     # If the body completes without a `return`, None is returned implicitly.
-    def __call__(self, interpreter, arguments):
+    def __call__(self, interpreter, arguments, extra_bindings=None):
         if len(arguments) != len(self.node.arg_tokens):
             raise ArityFault(f"Function '{self.node.name_token.value}' expects {len(self.node.arg_tokens)} arguments, but received {len(arguments)}")
 
@@ -129,23 +129,37 @@ class LuzFunction:
         for i in range(len(self.node.arg_tokens)):
             env.define(self.node.arg_tokens[i].value, arguments[i])
 
+        # extra_bindings lets callers inject additional names (e.g. `super`)
+        # into the method's local scope without touching the parameter list.
+        if extra_bindings:
+            for name, value in extra_bindings.items():
+                env.define(name, value)
+
         try:
             interpreter.execute_block(self.node.block, env)
         except ReturnException as e:
-            # `return expr` unwinds the call stack via exception; we catch it
-            # here (exactly one frame above the body) and extract the value.
             return e.value
-        return None  # Implicit return value when no `return` statement is reached
+        return None
 
 
 # ── Class and instance representation ────────────────────────────────────────
 
-# LuzClass holds the class name and its methods (a dict of name → LuzFunction).
+# LuzClass holds the class name, its methods, and an optional parent class.
 # It is stored in the environment under the class name, just like a function.
 class LuzClass:
-    def __init__(self, name, methods):
+    def __init__(self, name, methods, parent=None):
         self.name = name
         self.methods = methods  # dict: method_name -> LuzFunction
+        self.parent = parent    # LuzClass or None
+
+    def find_method(self, name):
+        # Walk up the class hierarchy to find a method by name.
+        cls = self
+        while cls is not None:
+            if name in cls.methods:
+                return cls.methods[name]
+            cls = cls.parent
+        return None
 
     def __repr__(self):
         return f"<class {self.name}>"
@@ -153,7 +167,7 @@ class LuzClass:
 
 # LuzInstance is the runtime object created when a class is called as a
 # constructor.  It stores instance attributes in a plain dict and looks up
-# methods on its class when an attribute is not found locally.
+# methods on its class hierarchy when an attribute is not found locally.
 class LuzInstance:
     def __init__(self, luz_class):
         self.luz_class = luz_class
@@ -162,8 +176,9 @@ class LuzInstance:
     def get(self, name):
         if name in self.attributes:
             return self.attributes[name]
-        if name in self.luz_class.methods:
-            return self.luz_class.methods[name]
+        method = self.luz_class.find_method(name)
+        if method is not None:
+            return method
         raise AttributeNotFoundFault(f"'{self.luz_class.name}' has no attribute '{name}'")
 
     def set(self, name, value):
@@ -171,6 +186,22 @@ class LuzInstance:
 
     def __repr__(self):
         return f"<{self.luz_class.name} instance>"
+
+
+# LuzSuperProxy gives methods access to the parent class's versions of methods.
+# When a method is called on an instance, `super` is injected into the local
+# scope as a LuzSuperProxy(instance, parent_class).  Calling super.method(args)
+# invokes the parent's method with the same instance, bypassing the child's override.
+class LuzSuperProxy:
+    def __init__(self, instance, parent_class):
+        self.instance = instance
+        self.parent_class = parent_class
+
+    def find_method(self, name):
+        method = self.parent_class.find_method(name)
+        if method is None:
+            raise AttributeNotFoundFault(f"Parent class has no method '{name}'")
+        return method
 
 
 # ── Interpreter ───────────────────────────────────────────────────────────────
@@ -699,11 +730,15 @@ class Interpreter:
             function = self.current_env.lookup(func_name)
 
             # Class constructor call: Dog("Rex") creates a new LuzInstance and
-            # calls the `init` method if one is defined.
+            # calls `init` if one is defined anywhere in the class hierarchy.
             if isinstance(function, LuzClass):
                 instance = LuzInstance(function)
-                if 'init' in function.methods:
-                    function.methods['init'](self, [instance] + arguments)
+                init_method = function.find_method('init')
+                if init_method is not None:
+                    extra = {}
+                    if function.parent:
+                        extra['super'] = LuzSuperProxy(instance, function.parent)
+                    init_method(self, [instance] + arguments, extra_bindings=extra)
                 return instance
 
             if not isinstance(function, LuzFunction):
@@ -917,11 +952,20 @@ class Interpreter:
 
     # visit_ClassDefNode() builds a LuzClass from the parsed method definitions
     # and stores it in the current environment under the class name.
+    # If an `extends` clause is present, the parent class is resolved from the
+    # environment and stored on the new class so method lookup can walk up.
     def visit_ClassDefNode(self, node):
+        parent = None
+        if node.parent_token is not None:
+            parent_val = self.current_env.lookup(node.parent_token.value)
+            if not isinstance(parent_val, LuzClass):
+                raise InvalidUsageFault(f"'{node.parent_token.value}' is not a class")
+            parent = parent_val
+
         methods = {}
         for method_node in node.methods:
             methods[method_node.name_token.value] = LuzFunction(method_node, self.current_env)
-        luz_class = LuzClass(node.name_token.value, methods)
+        luz_class = LuzClass(node.name_token.value, methods, parent)
         self.current_env.assign(node.name_token.value, luz_class)
         return luz_class
 
@@ -943,13 +987,35 @@ class Interpreter:
 
     # visit_MethodCallNode() calls obj.method(args), passing the instance as
     # the first argument so that the method body can access it via `self`.
+    # If the instance's class has a parent, `super` is injected into the method's
+    # local scope as a LuzSuperProxy so the method can call parent implementations.
     def visit_MethodCallNode(self, node):
         obj = self.visit(node.obj_node)
+        args = [self.visit(arg) for arg in node.arguments]
+
+        # super.method(args) — call the parent class's version with the same instance
+        if isinstance(obj, LuzSuperProxy):
+            method = obj.find_method(node.method_token.value)
+            if not isinstance(method, LuzFunction):
+                raise InvalidUsageFault(f"'{node.method_token.value}' is not a callable method")
+            # Pass the original instance (not the proxy) as `self` in the parent method.
+            # Also inject `super` pointing one level higher, enabling super chains.
+            extra = {}
+            grandparent = obj.parent_class.parent
+            if grandparent:
+                extra['super'] = LuzSuperProxy(obj.instance, grandparent)
+            return method(self, [obj.instance] + args, extra_bindings=extra)
+
         if not isinstance(obj, LuzInstance):
             raise InvalidUsageFault(f"Cannot call method on non-instance value '{obj}'")
+
         method = obj.get(node.method_token.value)
         if not isinstance(method, LuzFunction):
             raise InvalidUsageFault(f"'{node.method_token.value}' is not a callable method")
-        args = [self.visit(arg) for arg in node.arguments]
-        # Prepend the instance as the first argument (bound to `self` in the method).
-        return method(self, [obj] + args)
+
+        # Inject `super` if the class has a parent so methods can call super.method()
+        extra = {}
+        if obj.luz_class.parent:
+            extra['super'] = LuzSuperProxy(obj, obj.luz_class.parent)
+
+        return method(self, [obj] + args, extra_bindings=extra)

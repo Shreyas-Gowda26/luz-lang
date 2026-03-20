@@ -53,6 +53,7 @@ class Lexer:
         'pass': TokenType.PASS,
         'class': TokenType.CLASS,
         'self': TokenType.SELF,
+        'extends': TokenType.EXTENDS,
     }
 
     # ESCAPE_SEQUENCES maps the character after a backslash to the actual

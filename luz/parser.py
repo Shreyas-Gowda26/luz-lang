@@ -192,9 +192,11 @@ class PassNode:
     def __repr__(self): return "pass"
 
 # Represents a class definition: class Name { method ... }
+# or with inheritance:          class Name extends Parent { method ... }
 class ClassDefNode:
-    def __init__(self, name_token, methods):
+    def __init__(self, name_token, methods, parent_token=None):
         self.name_token = name_token
+        self.parent_token = parent_token  # IDENTIFIER token for the parent class, or None
         self.methods = methods  # List of FuncDefNode
 
 # Represents reading an attribute: obj.name
@@ -479,6 +481,16 @@ class Parser:
             raise UnexpectedTokenFault("Expected class name")
         name_token = self.current_token
         self.advance()
+
+        # Optional inheritance clause: extends ParentName
+        parent_token = None
+        if self.current_token.type == TokenType.EXTENDS:
+            self.advance()  # Consume 'extends'
+            if self.current_token.type != TokenType.IDENTIFIER:
+                raise UnexpectedTokenFault("Expected parent class name after 'extends'")
+            parent_token = self.current_token
+            self.advance()
+
         if self.current_token.type != TokenType.LBRACE:
             raise StructureFault("Expected '{' after class name")
         self.advance()  # Consume '{'
@@ -490,7 +502,7 @@ class Parser:
                 raise UnexpectedTokenFault("Expected method definition inside class")
             methods.append(self.func_def())
         self.advance()  # Consume '}'
-        node = ClassDefNode(name_token, methods); node.line = line
+        node = ClassDefNode(name_token, methods, parent_token); node.line = line
         return node
 
     # if_expr() parses the full if / elif* / else? chain into a single IfNode.

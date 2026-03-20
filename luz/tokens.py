@@ -87,6 +87,7 @@ class TokenType(Enum):
     # ── Object-oriented programming ───────────────────────────────────────────
     CLASS = auto()     # class keyword - begins a class definition
     SELF = auto()      # self - refers to the current instance
+    EXTENDS = auto()   # extends - declares the parent class:  class Dog extends Animal
     DOT = auto()       # .  - attribute access: obj.name
 
 
