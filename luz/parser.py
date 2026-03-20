@@ -425,7 +425,7 @@ class Parser:
         return self.bin_op(self.term, (TokenType.PLUS, TokenType.MINUS))
 
     def term(self):
-        return self.bin_op(self.power, (TokenType.MUL, TokenType.DIV, TokenType.MOD))
+        return self.bin_op(self.power, (TokenType.MUL, TokenType.DIV, TokenType.IDIV, TokenType.MOD))
 
     def power(self):
         base = self.factor()

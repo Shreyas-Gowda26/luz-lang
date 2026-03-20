@@ -9,6 +9,7 @@ class TokenType(Enum):
     DIV = auto()
     MOD = auto()
     POW = auto()
+    IDIV = auto()
     LPAREN = auto()
     RPAREN = auto()
     IDENTIFIER = auto()

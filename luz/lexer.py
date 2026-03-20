@@ -111,6 +111,14 @@ class Lexer:
         self.advance() # Skip ending quote
         return Token(TokenType.STRING, string_val, line)
 
+    def make_slash(self):
+        line = self.line
+        self.advance()
+        if self.current_char == '/':
+            self.advance()
+            return Token(TokenType.IDIV, None, line)
+        return Token(TokenType.DIV, None, line)
+
     def make_star(self):
         line = self.line
         self.advance()
@@ -178,8 +186,8 @@ class Lexer:
                 tokens.append(Token(TokenType.MOD, None, self.line))
                 self.advance()
             elif self.current_char == '/':
-                tokens.append(Token(TokenType.DIV, None, self.line))
-                self.advance()
+                tokens.append(self.make_slash())
+
             elif self.current_char == '(':
                 tokens.append(Token(TokenType.LPAREN, None, self.line))
                 self.advance()

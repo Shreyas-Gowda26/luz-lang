@@ -302,6 +302,13 @@ class Interpreter:
                 return float(left) / float(right)
             except TypeError:
                 raise IllegalOperationFault(f"Unsupported operand types for '/': {type(left).__name__} and {type(right).__name__}")
+        elif node.op_token.type == TokenType.IDIV:
+            if right == 0:
+                raise ZeroDivisionFault("Integer division by zero is not allowed")
+            try:
+                return int(left) // int(right)
+            except TypeError:
+                raise IllegalOperationFault(f"Unsupported operand types for '//': {type(left).__name__} and {type(right).__name__}")
         elif node.op_token.type == TokenType.MOD:
             if right == 0:
                 raise ZeroDivisionFault("Modulo by zero is not allowed")
