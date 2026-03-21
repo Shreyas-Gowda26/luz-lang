@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/icon.png" alt="Luz logo" width="120">
+  <img src="img/icon.png" alt="Luz logo" width="676" height="369">
 </p>
 
 # Luz Programming Language
