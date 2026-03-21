@@ -4,13 +4,13 @@
 
 ```
 name = listen("What is your name? ")
-write("Hello, " + name + "!")
+write($"Hello {name}!")
 
 for i = 1 to 5 {
-    if i % 2 == 0 {
-        write(i, "is even")
+    if even(i) {
+        write($"{i} is even")
     } else {
-        write(i, "is odd")
+        write($"{i} is odd")
     }
 }
 ```
@@ -40,13 +40,15 @@ for i = 1 to 5 {
 
 ## Features
 
-- **Dynamic typing** — integers, floats, strings, booleans, lists, dictionaries
+- **Dynamic typing** — integers, floats, strings, booleans, lists, dictionaries, `null`
 - **Arithmetic operators** — `+`, `-`, `*`, `/`, `//`, `%`, `**`
+- **Format strings** — `$"Hello {name}, you are {age} years old!"`
 - **String operations** — indexing, escape sequences, and 11 built-in string functions
-- **Control flow** — `if / elif / else`, `while`, `for`, `break`, `continue`, `pass`
+- **Control flow** — `if / elif / else`, `while`, `for` (range and for-each), `break`, `continue`, `pass`
 - **Functions** — user-defined functions with closures and return values
 - **Object-oriented programming** — classes, instances, inheritance (`extends`), method overriding, and `super`
 - **Polymorphism** — duck typing, `typeof()`, and `instanceof()`
+- **Math built-ins** — `abs`, `sqrt`, `floor`, `ceil`, `round`, `clamp`, `max`, `min`, `sign`, `odd`, `even`
 - **Error handling** — `attempt / rescue` blocks and `alert`
 - **Modules** — `import` other `.luz` files
 - **Helpful errors** — every error message includes the line number
@@ -108,6 +110,7 @@ Install the extension from the `vscode-luz/` folder:
 | Float | `3.14`, `-0.5` | Decimal numbers |
 | String | `"hello"` | Double quotes, supports escape sequences |
 | Boolean | `true`, `false` | Lowercase |
+| Null | `null` | Absence of a value |
 | List | `[1, "two", 3.0]` | Mixed types allowed |
 | Dictionary | `{"key": value}` | String or number keys |
 
@@ -132,6 +135,7 @@ x = 10
 name = "Luz"
 items = [1, 2, 3]
 data = {"score": 100}
+empty = null
 ```
 
 ---
@@ -146,6 +150,7 @@ data = {"score": 100}
 | `-` | Subtraction | `10 - 4` → `6` |
 | `*` | Multiplication / string repeat | `"ab" * 3` → `"ababab"` |
 | `/` | Division (always float) | `7 / 2` → `3.5` |
+| `//` | Integer division | `7 // 2` → `3` |
 | `%` | Modulo | `10 % 3` → `1` |
 | `**` | Power (right-associative) | `2 ** 8` → `256` |
 
@@ -170,7 +175,7 @@ data = {"score": 100}
 
 ```
 **
-* / %
+* / // %
 + -
 == != < > <= >=
 not
@@ -206,13 +211,32 @@ while i < 5 {
 }
 ```
 
-**for**
+**for — range loop**
 
 Iterates from `start` to `end` (inclusive), incrementing by 1.
 
 ```
 for i = 1 to 10 {
     write(i)
+}
+```
+
+**for — for-each loop**
+
+Iterates over a list, string (character by character), or dict (by key).
+
+```
+fruits = ["apple", "banana", "cherry"]
+for fruit in fruits {
+    write(fruit)
+}
+
+for ch in "hello" {
+    write(ch)
+}
+
+for key in {"a": 1, "b": 2} {
+    write(key)
 }
 ```
 
@@ -229,6 +253,23 @@ if true {
     pass   # placeholder for empty blocks
 }
 ```
+
+---
+
+### Format Strings
+
+Prefix a string with `$` to embed expressions inside `{ }`:
+
+```
+name = "Alice"
+age = 30
+write($"Hello {name}, you are {age} years old!")
+write($"2 + 2 = {2 + 2}")
+write($"uppercase: {uppercase(name)}")
+write($"null value: {null}")
+```
+
+Any valid Luz expression works inside `{ }`.
 
 ---
 
@@ -264,12 +305,14 @@ function make_counter() {
 ```
 fruits = ["apple", "banana", "cherry"]
 
-write(fruits[0])      # apple
-write(fruits[-1])     # cherry
-
+write(fruits[0])          # apple
 fruits[1] = "mango"
 append(fruits, "grape")
-write(len(fruits))    # 4
+write(len(fruits))        # 4
+
+for fruit in fruits {
+    write(fruit)
+}
 ```
 
 **Dictionaries**
@@ -282,6 +325,10 @@ person["age"] = 31
 
 write(keys(person))       # ["name", "age"]
 write(values(person))     # ["Alice", 31]
+
+for key in person {
+    write($"{key}: {person[key]}")
+}
 ```
 
 ---
@@ -296,7 +343,7 @@ class Animal {
         self.name = name
     }
     function speak(self) {
-        write(self.name + " makes a sound")
+        write($"{self.name} makes a sound")
     }
 }
 
@@ -345,8 +392,8 @@ class Rectangle extends Shape {
 }
 
 shapes = [Circle(5), Rectangle(4, 6)]
-for i = 0 to 1 {
-    write(shapes[i].area())
+for shape in shapes {
+    write(shape.area())
 }
 ```
 
@@ -355,6 +402,7 @@ for i = 0 to 1 {
 ```
 write(typeof(42))             # int
 write(typeof("hello"))        # string
+write(typeof(null))           # null
 write(typeof(d))              # Dog
 
 write(instanceof(d, Dog))     # true
@@ -432,6 +480,22 @@ result = my_function(42)
 | `to_bool(v)` | Convert to boolean |
 | `to_num(v)` | Convert to int or float (auto-detect) |
 
+**Math**
+
+| Function | Description | Example |
+|---|---|---|
+| `abs(x)` | Absolute value | `abs(-7)` → `7` |
+| `sqrt(x)` | Square root | `sqrt(16)` → `4.0` |
+| `floor(x)` | Round down to integer | `floor(3.9)` → `3` |
+| `ceil(x)` | Round up to integer | `ceil(3.1)` → `4` |
+| `round(x, digits?)` | Round to N decimal places | `round(3.567, 2)` → `3.57` |
+| `clamp(x, low, high)` | Force x into range [low, high] | `clamp(15, 0, 10)` → `10` |
+| `max(a, b, ...)` | Maximum of values or a list | `max(3, 8, 2)` → `8` |
+| `min(a, b, ...)` | Minimum of values or a list | `min([5, 1, 9])` → `1` |
+| `sign(x)` | Returns -1, 0, or 1 | `sign(-5)` → `-1` |
+| `odd(x)` | True if x is odd | `odd(3)` → `true` |
+| `even(x)` | True if x is even | `even(4)` → `true` |
+
 **Lists**
 
 | Function | Description |
@@ -451,8 +515,6 @@ result = my_function(42)
 | `remove(dict, key)` | Remove key and return its value |
 
 **Strings**
-
-All string functions take the string as first argument.
 
 | Function | Description | Example |
 |---|---|---|
@@ -493,7 +555,7 @@ Source code (text)
 
 ### Lexer (`luz/lexer.py`)
 
-Converts raw source text into a flat list of tokens. Handles numbers, strings (with escape sequences), identifiers, keywords, and operators. Tracks line numbers for every token to enable helpful error messages.
+Converts raw source text into a flat list of tokens. Handles numbers, strings (with escape sequences), format strings, identifiers, keywords, and operators. Tracks line numbers for every token to enable helpful error messages.
 
 ### Parser (`luz/parser.py`)
 
@@ -504,13 +566,15 @@ logical_or → logical_and → logical_not → comparison
           → arithmetic → term → power → factor
 ```
 
-Each node type (e.g. `BinOpNode`, `IfNode`, `CallNode`) is a plain Python class defined at the top of the file.
+Each node type (e.g. `BinOpNode`, `IfNode`, `CallNode`, `ClassDefNode`) is a plain Python class defined at the top of the file.
 
 ### Interpreter (`luz/interpreter.py`)
 
 Walks the AST using the **Visitor pattern**: `visit(node)` dynamically dispatches to `visit_IfNode`, `visit_BinOpNode`, etc.
 
 Scope is managed through a chain of `Environment` objects — each block or function call creates a new environment linked to its parent, enabling proper variable scoping and closures.
+
+OOP is implemented through `LuzClass`, `LuzInstance`, and `LuzSuperProxy` objects. Method calls automatically inject `self` and `super` into the method's local scope.
 
 Control flow signals (`return`, `break`, `continue`) are implemented as Python exceptions that propagate up the call stack and are caught at the appropriate level.
 
@@ -545,13 +609,12 @@ luz-lang/
 └── examples/             # Example programs
 ```
 
-
 ---
 
 ## Running Tests
 
 ```bash
-python run_tests.py
+python tests/test_suite.py
 ```
 
 ---
@@ -566,10 +629,9 @@ Contributions are welcome. If you want to add a feature, fix a bug, or improve t
 4. Open a pull request
 
 If you're looking for ideas, check the open issues or consider:
-- Built-in math functions (`abs`, `min`, `max`, `round`)
 - First-class functions (passing functions as values)
 - Negative index support for lists
-- More test coverage, especially for OOP
+- More test coverage, especially for OOP and format strings
 
 ---
 
