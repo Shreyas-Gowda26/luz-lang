@@ -10,5 +10,8 @@ dist/
 build/
 *.spec
 
+# Inno Setup output
+installer_output/
+
 # MkDocs
 site/
