@@ -9,7 +9,7 @@ python main.py
 ```
 
 ```
-Luz Interpreter v1.1 - Type 'exit' to terminate
+Luz Interpreter v1.8.0 - Type 'exit' to terminate
 Luz > x = 10
 Luz > write(x * 2)
 20
