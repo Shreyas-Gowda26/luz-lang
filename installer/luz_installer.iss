@@ -26,6 +26,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "..\dist\luz.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\ray.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\libs\*"; DestDir: "{app}\lib"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Luz REPL"; Filename: "{app}\luz.exe"
@@ -36,6 +37,9 @@ Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environmen
     ValueType: expandsz; ValueName: "Path"; \
     ValueData: "{olddata};{app}"; \
     Check: NeedsAddPath('{app}')
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
+    ValueType: string; ValueName: "LUZ_HOME"; \
+    ValueData: "{app}"
 
 [Code]
 function NeedsAddPath(Param: string): boolean;

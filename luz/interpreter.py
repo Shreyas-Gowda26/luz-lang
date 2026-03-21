@@ -549,14 +549,22 @@ class Interpreter:
 
         # Resolution order:
         #   1. Path as written (relative or absolute)
-        #   2. luz_modules/<name>/<name>.luz
-        #   3. luz_modules/<name>/main.luz
+        #   2. luz_modules/<name>/<name>.luz  (local project)
+        #   3. luz_modules/<name>/main.luz    (local project)
+        #   4. LUZ_HOME/lib/<name>/<name>.luz (global stdlib)
+        #   5. LUZ_HOME/lib/<name>/main.luz   (global stdlib)
         if not os.path.exists(file_path):
             name = os.path.splitext(os.path.basename(file_path))[0]
             candidates = [
                 os.path.join("luz_modules", name, f"{name}.luz"),
                 os.path.join("luz_modules", name, "main.luz"),
             ]
+            luz_home = os.environ.get("LUZ_HOME")
+            if luz_home:
+                candidates += [
+                    os.path.join(luz_home, "lib", name, f"{name}.luz"),
+                    os.path.join(luz_home, "lib", name, "main.luz"),
+                ]
             for candidate in candidates:
                 if os.path.exists(candidate):
                     file_path = candidate
