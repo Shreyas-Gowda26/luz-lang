@@ -1,15 +1,21 @@
 {
-    "name": "luz-syntax",
-    "displayName": "Luz Syntax Highlighter",
-    "description": "Syntax highlighting for the Luz Programming Language",
+    "name": "luz",
+    "displayName": "Luz Language",
+    "description": "Luz language support: syntax highlighting, autocompletion, error detection, snippets",
     "version": "1.0.0",
     "publisher": "Elabsurdo984",
+    "icon": "icon.png",
     "engines": {
-        "vscode": "^1.50.0"
+        "vscode": "^1.75.0"
     },
     "categories": [
-        "Programming Languages"
+        "Programming Languages",
+        "Snippets"
     ],
+    "activationEvents": [
+        "onLanguage:luz"
+    ],
+    "main": "./out/extension.js",
     "contributes": {
         "languages": [{
             "id": "luz",
@@ -21,6 +27,29 @@
             "language": "luz",
             "scopeName": "source.luz",
             "path": "./syntaxes/luz.tmLanguage.json"
-        }]
+        }],
+        "snippets": [{
+            "language": "luz",
+            "path": "./snippets/luz.json"
+        }],
+        "configuration": {
+            "title": "Luz",
+            "properties": {
+                "luz.executablePath": {
+                    "type": "string",
+                    "default": "luz",
+                    "description": "Path to the luz executable"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "@types/vscode": "^1.75.0",
+        "typescript": "^5.0.0"
     }
 }

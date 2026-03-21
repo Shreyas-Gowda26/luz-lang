@@ -15,3 +15,7 @@ installer_output/
 
 # MkDocs
 site/
+
+# VS Code extension build
+vscode-luz/node_modules/
+vscode-luz/out/

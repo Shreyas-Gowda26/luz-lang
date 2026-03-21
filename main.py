@@ -21,9 +21,29 @@ def run(text, interpreter):
         print(f"{prefix}{error_name}: {msg}")
         return None
 
+def check(filename):
+    """Parse-only mode for the VS Code extension. Outputs errors as JSON."""
+    import json
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            code = f.read()
+        lexer = Lexer(code)
+        tokens = lexer.get_tokens()
+        parser = Parser(tokens)
+        parser.parse()
+        print(json.dumps([]))
+    except Exception as e:
+        line = getattr(e, 'line', None)
+        msg = getattr(e, 'message', str(e))
+        print(json.dumps([{"line": line, "message": msg}]))
+
 def main():
     interpreter = Interpreter()
-    
+
+    if len(sys.argv) > 2 and sys.argv[1] == '--check':
+        check(sys.argv[2])
+        return
+
     if len(sys.argv) > 1:
         filename = sys.argv[1]
         try:
