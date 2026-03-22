@@ -21,5 +21,10 @@ jobs:
       - name: Install MkDocs
         run: pip install mkdocs-material
 
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force
