@@ -119,36 +119,50 @@ class LuzFunction:
     # It validates the argument count, binds parameters to a new environment,
     # runs the body, and catches ReturnException to extract the return value.
     # If the body completes without a `return`, None is returned implicitly.
-    def __call__(self, interpreter, arguments, extra_bindings=None):
+    def __call__(self, interpreter, arguments, extra_bindings=None, kwargs=None):
+        kwargs = kwargs or {}
+        param_names = [t.value for t in self.node.arg_tokens]
         total = len(self.node.arg_tokens)
         variadic = self.node.variadic
-        # Number of fixed (non-variadic) params
         fixed = total - 1 if variadic else total
-        required = sum(1 for d in self.node.defaults[:fixed] if d is None)
+
+        # Validate named args refer to real parameters
+        for name in kwargs:
+            if name not in param_names[:fixed]:
+                raise ArgumentFault(f"Function '{self.node.name_token.value}' has no parameter '{name}'")
+
+        # Check no positional arg also given as named arg
+        for i, arg_token in enumerate(self.node.arg_tokens[:min(len(arguments), fixed)]):
+            if arg_token.value in kwargs:
+                raise ArgumentFault(f"Argument '{arg_token.value}' given both positionally and by name")
+
+        required = sum(1 for i, d in enumerate(self.node.defaults[:fixed])
+                       if d is None and self.node.arg_tokens[i].value not in kwargs)
 
         if variadic:
             if len(arguments) < required:
                 raise ArityFault(f"Function '{self.node.name_token.value}' expects at least {required} argument(s), but received {len(arguments)}")
         else:
-            if len(arguments) < required or len(arguments) > total:
-                if required == total:
-                    raise ArityFault(f"Function '{self.node.name_token.value}' expects {total} argument(s), but received {len(arguments)}")
+            total_provided = len(arguments) + len(kwargs)
+            if total_provided < required or len(arguments) > fixed:
+                if required == fixed:
+                    raise ArityFault(f"Function '{self.node.name_token.value}' expects {fixed} argument(s), but received {total_provided}")
                 else:
-                    raise ArityFault(f"Function '{self.node.name_token.value}' expects {required}–{total} argument(s), but received {len(arguments)}")
+                    raise ArityFault(f"Function '{self.node.name_token.value}' expects {required}–{fixed} argument(s), but received {total_provided}")
 
-        # Create a new child of the closure so parameters are local to this call.
-        # is_function_scope=True prevents assignments inside the body from
-        # walking up into the caller's environment.
         env = Environment(self.closure, is_function_scope=True)
         for i in range(fixed):
+            name = self.node.arg_tokens[i].value
             if i < len(arguments):
-                env.define(self.node.arg_tokens[i].value, arguments[i])
+                env.define(name, arguments[i])
+            elif name in kwargs:
+                env.define(name, kwargs[name])
             else:
                 prev = interpreter.current_env
                 interpreter.current_env = self.closure
                 default_val = interpreter.visit(self.node.defaults[i])
                 interpreter.current_env = prev
-                env.define(self.node.arg_tokens[i].value, default_val)
+                env.define(name, default_val)
         if variadic:
             env.define(self.node.arg_tokens[fixed].value, list(arguments[fixed:]))
 
@@ -1017,18 +1031,17 @@ class Interpreter:
     # Built-in functions are checked first (they shadow user-defined functions).
     def visit_CallNode(self, node):
         func_name = node.func_name_token.value
-        # Arguments are fully evaluated before the call so their values are
-        # independent of the callee's scope.
         arguments = [self.visit(arg) for arg in node.arguments]
+        kwargs = {name: self.visit(expr) for name, expr in node.kwargs.items()}
 
         if func_name in self.builtins:
+            if kwargs:
+                raise ArgumentFault(f"Built-in function '{func_name}' does not support named arguments")
             return self.builtins[func_name](*arguments)
 
         try:
             function = self.current_env.lookup(func_name)
 
-            # Class constructor call: Dog("Rex") creates a new LuzInstance and
-            # calls `init` if one is defined anywhere in the class hierarchy.
             if isinstance(function, LuzClass):
                 instance = LuzInstance(function)
                 init_method = function.find_method('init')
@@ -1036,18 +1049,16 @@ class Interpreter:
                     extra = {}
                     if function.parent:
                         extra['super'] = LuzSuperProxy(instance, function.parent)
-                    init_method(self, [instance] + arguments, extra_bindings=extra)
+                    init_method(self, [instance] + arguments, extra_bindings=extra, kwargs=kwargs)
                 return instance
 
             if not isinstance(function, (LuzFunction, LuzLambda)):
-                # The name exists but holds a non-callable value (e.g. a number).
                 raise InvalidUsageFault(f"'{func_name}' is not a callable function")
-            return function(self, arguments)
+            return function(self, arguments, kwargs=kwargs)
         except UndefinedSymbolFault:
-            # Re-raise as FunctionNotFoundFault for a more descriptive message.
             raise FunctionNotFoundFault(f"Function '{func_name}' was not found")
         except LuzError as e:
-            raise e  # Preserve the original LuzError type (don't wrap it)
+            raise e
         except Exception as e:
             raise InternalFault(str(e))
 
@@ -1294,6 +1305,7 @@ class Interpreter:
     def visit_MethodCallNode(self, node):
         obj = self.visit(node.obj_node)
         args = [self.visit(arg) for arg in node.arguments]
+        kwargs = {name: self.visit(expr) for name, expr in node.kwargs.items()}
 
         # super.method(args) — call the parent class's version with the same instance
         if isinstance(obj, LuzSuperProxy):
@@ -1306,7 +1318,7 @@ class Interpreter:
             grandparent = obj.parent_class.parent
             if grandparent:
                 extra['super'] = LuzSuperProxy(obj.instance, grandparent)
-            return method(self, [obj.instance] + args, extra_bindings=extra)
+            return method(self, [obj.instance] + args, extra_bindings=extra, kwargs=kwargs)
 
         if not isinstance(obj, LuzInstance):
             raise InvalidUsageFault(f"Cannot call method on non-instance value '{obj}'")
@@ -1320,7 +1332,7 @@ class Interpreter:
         if obj.luz_class.parent:
             extra['super'] = LuzSuperProxy(obj, obj.luz_class.parent)
 
-        return method(self, [obj] + args, extra_bindings=extra)
+        return method(self, [obj] + args, extra_bindings=extra, kwargs=kwargs)
 
     # ── Type inspection built-ins ─────────────────────────────────────────────
 

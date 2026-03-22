@@ -308,17 +308,19 @@ class MatchNode:
         self.arms = arms  # [(pattern_nodes | None, result_node), …]
 
 class MethodCallNode:
-    def __init__(self, obj_node, method_token, arguments):
+    def __init__(self, obj_node, method_token, arguments, kwargs=None):
         self.obj_node = obj_node
         self.method_token = method_token
         self.arguments = arguments
+        self.kwargs = kwargs or {}   # {name: expr_node}
 
 # Represents a function call: name(arg, arg, …)
 # arguments is a list of AST nodes (the evaluated argument expressions).
 class CallNode:
-    def __init__(self, func_name_token, arguments):
+    def __init__(self, func_name_token, arguments, kwargs=None):
         self.func_name_token = func_name_token
         self.arguments = arguments
+        self.kwargs = kwargs or {}   # {name: expr_node}
     def __repr__(self): return f"{self.func_name_token.value}({self.arguments})"
 
 
@@ -1119,20 +1121,13 @@ class Parser:
             attr_token = self.current_token
             self.advance()  # Consume the attribute/method name
             if self.current_token.type == TokenType.LPAREN:
-                # Method call: obj.method(args)
+                # Method call: obj.method(args) or obj.method(name: val, …)
                 self.advance()  # Consume '('
-                args = []
-                if self.current_token.type != TokenType.RPAREN:
-                    args.append(self.expr())
-                    while self.current_token.type == TokenType.COMMA:
-                        self.advance()
-                        if self.current_token.type == TokenType.RPAREN:
-                            break
-                        args.append(self.expr())
+                args, kwargs = self.parse_call_args()
                 if self.current_token.type != TokenType.RPAREN:
                     raise UnexpectedTokenFault("Expected ')'")
                 self.advance()  # Consume ')'
-                node = MethodCallNode(node, attr_token, args)
+                node = MethodCallNode(node, attr_token, args, kwargs)
                 node.line = dot_line
             else:
                 # Attribute read: obj.attr
@@ -1147,22 +1142,13 @@ class Parser:
         token = self.current_token
         self.advance()  # Consume the identifier
         if self.current_token.type == TokenType.LPAREN:
-            # Function call: identifier(arg, …)
+            # Function call: identifier(arg, …) or identifier(name: val, …)
             self.advance()  # Consume '('
-            args = []
-            if self.current_token.type != TokenType.RPAREN:
-                args.append(self.expr())
-                while self.current_token.type == TokenType.COMMA:
-                    self.advance()  # Consume ','
-                    # A trailing comma before ')' is tolerated (e.g. f(a,))
-                    if self.current_token.type == TokenType.RPAREN:
-                        break
-                    args.append(self.expr())
-
+            args, kwargs = self.parse_call_args()
             if self.current_token.type != TokenType.RPAREN:
                 raise UnexpectedTokenFault("Expected ',' or ')'")
             self.advance()  # Consume ')'
-            node = CallNode(token, args); node.line = token.line
+            node = CallNode(token, args, kwargs); node.line = token.line
             return node
         else:
             # Plain variable read
@@ -1334,6 +1320,41 @@ class Parser:
         self.advance()  # Consume '}'
         node = DictNode(pairs); node.line = line
         return node
+
+    # parse_call_args() parses the argument list inside a function/method call,
+    # supporting both positional and named arguments.
+    # Named args: identifier: expr   (must come after all positional args)
+    # Returns (positional_list, kwargs_dict).
+    def parse_call_args(self):
+        positional = []
+        kwargs = {}
+        named_started = False
+        while self.current_token.type != TokenType.RPAREN:
+            # Detect named arg: IDENTIFIER followed by COLON
+            is_named = (
+                self.current_token.type == TokenType.IDENTIFIER and
+                self.pos + 1 < len(self.tokens) and
+                self.tokens[self.pos + 1].type == TokenType.COLON
+            )
+            if is_named:
+                named_started = True
+                name = self.current_token.value
+                self.advance()  # Consume name
+                self.advance()  # Consume ':'
+                if name in kwargs:
+                    raise StructureFault(f"Duplicate named argument '{name}'")
+                kwargs[name] = self.expr()
+            else:
+                if named_started:
+                    raise StructureFault("Positional argument cannot follow a named argument")
+                positional.append(self.expr())
+            if self.current_token.type == TokenType.COMMA:
+                self.advance()  # Consume ','
+                if self.current_token.type == TokenType.RPAREN:
+                    break  # Trailing comma
+            elif self.current_token.type != TokenType.RPAREN:
+                raise UnexpectedTokenFault("Expected ',' or ')'")
+        return positional, kwargs
 
     # bin_op() is a reusable helper that implements left-associative binary
     # operators for a given precedence level.
