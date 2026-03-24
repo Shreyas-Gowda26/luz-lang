@@ -1400,16 +1400,12 @@ class Interpreter:
         obj = self.visit(node.obj_node)
         args = [self.visit(arg) for arg in node.arguments]
         kwargs = {name: self.visit(expr) for name, expr in node.kwargs.items()}
-        
-        # String method dot syntax: "hello".upper(), "hello".trim(), etc.
         if isinstance(obj, str):
             str_methods = {
-                'upper': lambda: obj.upper(),
-                'lower': lambda: obj.lower(),
                 'uppercase': lambda: obj.upper(),
                 'lowercase': lambda: obj.lower(),
                 'trim': lambda: obj.strip(),
-                'replace': lambda: obj.replace(args[0], args[1]),
+                'swap': lambda: obj.replace(args[0], args[1]),
                 'split': lambda: obj.split(args[0]) if args else obj.split(),
             }
             method_name = node.method_token.value
